@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SheetSync - Kiosco de Confianza & Cobranza Quincenal</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React 18, ReactDOM & Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- SheetJS (Excel) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 antialiased min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // --- TEMAS DE COLOR DISPONIBLES ---
+    const THEMES = {
+      emerald: {
+        name: 'Esmeralda Kiosco (Verde)',
+        previewBg: 'bg-emerald-500',
+        primaryBg: 'bg-emerald-600',
+        primaryHover: 'hover:bg-emerald-700',
+        primaryLightBg: 'bg-emerald-50',
+        primaryLightBorder: 'border-emerald-200',
+        primaryText: 'text-emerald-700',
+        gradientHeader: 'from-emerald-600 via-teal-600 to-emerald-700',
+        canvasGrad1: '#059669',
+        canvasGrad2: '#0d9488'
+      },
+      blue: {
+        name: 'Azul Océano',
+        previewBg: 'bg-blue-500',
+        primaryBg: 'bg-blue-600',
+        primaryHover: 'hover:bg-blue-700',
+        primaryLightBg: 'bg-blue-50',
+        primaryLightBorder: 'border-blue-200',
+        primaryText: 'text-blue-700',
+        gradientHeader: 'from-blue-600 via-indigo-600 to-blue-700',
+        canvasGrad1: '#2563eb',
+        canvasGrad2: '#4f46e5'
+      },
+      purple: {
+        name: 'Púrpura & Violeta',
+        previewBg: 'bg-purple-500',
+        primaryBg: 'bg-purple-600',
+        primaryHover: 'hover:bg-purple-700',
+        primaryLightBg: 'bg-purple-50',
+        primaryLightBorder: 'border-purple-200',
+        primaryText: 'text-purple-700',
+        gradientHeader: 'from-purple-600 via-fuchsia-600 to-purple-700',
+        canvasGrad1: '#9333ea',
+        canvasGrad2: '#c026d3'
+      },
+      amber: {
+        name: 'Ámbar & Naranja',
+        previewBg: 'bg-amber-500',
+        primaryBg: 'bg-amber-600',
+        primaryHover: 'hover:bg-amber-700',
+        primaryLightBg: 'bg-amber-50',
+        primaryLightBorder: 'border-amber-200',
+        primaryText: 'text-amber-700',
+        gradientHeader: 'from-amber-600 via-orange-600 to-amber-700',
+        canvasGrad1: '#d97706',
+        canvasGrad2: '#ea580c'
+      },
+      rose: {
+        name: 'Rosa & Carmesí',
+        previewBg: 'bg-rose-500',
+        primaryBg: 'bg-rose-600',
+        primaryHover: 'hover:bg-rose-700',
+        primaryLightBg: 'bg-rose-50',
+        primaryLightBorder: 'border-rose-200',
+        primaryText: 'text-rose-700',
+        gradientHeader: 'from-rose-600 via-pink-600 to-rose-700',
+        canvasGrad1: '#e11d48',
+        canvasGrad2: '#db2777'
+      },
+      cyan: {
+        name: 'Turquesa / Nevera',
+        previewBg: 'bg-cyan-500',
+        primaryBg: 'bg-cyan-600',
+        primaryHover: 'hover:bg-cyan-700',
+        primaryLightBg: 'bg-cyan-50',
+        primaryLightBorder: 'border-cyan-200',
+        primaryText: 'text-cyan-700',
+        gradientHeader: 'from-cyan-600 via-teal-600 to-cyan-700',
+        canvasGrad1: '#0891b2',
+        canvasGrad2: '#0d9488'
+      },
+      slate: {
+        name: 'Carbón Minimalista',
+        previewBg: 'bg-slate-700',
+        primaryBg: 'bg-slate-800',
+        primaryHover: 'hover:bg-slate-900',
+        primaryLightBg: 'bg-slate-100',
+        primaryLightBorder: 'border-slate-300',
+        primaryText: 'text-slate-800',
+        gradientHeader: 'from-slate-800 via-zinc-800 to-slate-900',
+        canvasGrad1: '#1e293b',
+        canvasGrad2: '#334155'
+      }
+    };
+
+    // --- CONFIGURACIÓN INICIAL Y PRODUCTOS ---
+    const INITIAL_PRODUCTS = [
+      { id: 'prod-fruton', nombre: 'FRUTON', precio: 0.70, categoria: 'Bebidas', emoji: '🧃', imagenUrl: '', stockNevera: 12, stockDeposito: 24 },
+      { id: 'prod-malta', nombre: 'MALTA', precio: 1.00, categoria: 'Bebidas', emoji: '🥤', imagenUrl: '', stockNevera: 15, stockDeposito: 30 },
+      { id: 'prod-glu-bombita', nombre: 'GLU BOMBITA', precio: 0.50, categoria: 'Dulces', emoji: '🍬', promo: '2 por 1$', imagenUrl: '', stockNevera: 20, stockDeposito: 50 },
+      { id: 'prod-cool-power', nombre: 'COOL POWER', precio: 0.80, categoria: 'Bebidas', emoji: '⚡', imagenUrl: '', stockNevera: 10, stockDeposito: 20 },
+      { id: 'prod-tea-durazno', nombre: 'TEA DURAZNO', precio: 0.80, categoria: 'Bebidas', emoji: '🍑', imagenUrl: '', stockNevera: 10, stockDeposito: 20 }
+    ];
+
+    const INITIAL_SETTINGS = {
+      scriptUrl: '',
+      currency: '$',
+      businessName: 'Kiosco & Frigobar de Confianza',
+      businessSubtitle: 'Acerca tu celular al NFC, anota lo que te llevas y paga en la quincena',
+      paymentInfo: 'Transferencia / Pago Móvil: 04140153904\nTitular: Andrés Omaña',
+      adminPin: '4520091',
+      logoUrl: '',
+      themeColor: 'emerald'
+    };
+
+    function formatMoney(amount, currency = '$') {
+      const val = Number(amount) || 0;
+      return `${currency}${val.toFixed(2)}`;
+    }
+
+    function roundMoney(amount) {
+      return Math.round((Number(amount) || 0) * 100) / 100;
+    }
+
+    // --- APP PRINCIPAL ---
+    function App() {
+      const [products, setProducts] = useState(() => {
+        const saved = localStorage.getItem('sheetsync_products');
+        return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+      });
+
+      const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem('sheetsync_settings');
+        return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+      });
+
+      const [orders, setOrders] = useState(() => {
+        const saved = localStorage.getItem('sheetsync_orders');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      const [payments, setPayments] = useState(() => {
+        const saved = localStorage.getItem('sheetsync_payments');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      const [viewMode, setViewMode] = useState('kiosk');
+      const [adminTab, setAdminTab] = useState('quincena');
+      const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+      
+      const [showPinModal, setShowPinModal] = useState(false);
+      const [pinInput, setPinInput] = useState('');
+      const [pinError, setPinError] = useState(false);
+
+      const [recordPaymentBuyer, setRecordPaymentBuyer] = useState(null);
+      const [exportBuyer, setExportBuyer] = useState(null);
+
+      const currentTheme = THEMES[settings.themeColor || 'emerald'] || THEMES.emerald;
+
+      useEffect(() => {
+        localStorage.setItem('sheetsync_products', JSON.stringify(products));
+      }, [products]);
+
+      useEffect(() => {
+        localStorage.setItem('sheetsync_settings', JSON.stringify(settings));
+      }, [settings]);
+
+      useEffect(() => {
+        localStorage.setItem('sheetsync_orders', JSON.stringify(orders));
+      }, [orders]);
+
+      useEffect(() => {
+        localStorage.setItem('sheetsync_payments', JSON.stringify(payments));
+      }, [payments]);
+
+      // Resumen de compradores
+      const buyersSummary = useMemo(() => {
+        const map = new Map();
+        for (const ord of orders) {
+          const k = ord.nombre.toLowerCase().trim();
+          if (!k) continue;
+          let b = map.get(k);
+          if (!b) {
+            b = {
+              nombre: ord.nombre.trim(),
+              telefono: ord.telefono || '',
+              totalMonto: 0,
+              montoPagado: 0,
+              montoPendiente: 0,
+              totalProductos: 0,
+              ordenes: [],
+              pagos: [],
+              productosDesglose: {}
+            };
+            map.set(k, b);
+          }
+          if (ord.telefono && !b.telefono) b.telefono = ord.telefono;
+          b.ordenes.push(ord);
+          b.totalMonto += ord.monto || 0;
+          b.totalProductos += ord.cantidad || 1;
+
+          if (ord.items && ord.items.length > 0) {
+            for (const item of ord.items) {
+              const name = item.nombre;
+              if (!b.productosDesglose[name]) b.productosDesglose[name] = { cantidad: 0, total: 0 };
+              b.productosDesglose[name].cantidad += item.cantidad;
+              b.productosDesglose[name].total += (item.precio * item.cantidad);
+            }
+          } else {
+            const name = ord.producto || 'Varios';
+            if (!b.productosDesglose[name]) b.productosDesglose[name] = { cantidad: 0, total: 0 };
+            b.productosDesglose[name].cantidad += ord.cantidad || 1;
+            b.productosDesglose[name].total += ord.monto;
+          }
+        }
+
+        const list = Array.from(map.values());
+        for (const b of list) {
+          const k = b.nombre.toLowerCase().trim();
+          b.pagos = payments.filter(p => p.nombre.toLowerCase().trim() === k);
+          const sumAbonos = b.pagos.reduce((acc, p) => acc + (p.monto || 0), 0);
+          const sumDirectPaid = b.ordenes.filter(o => o.estadoPago === 'pagado').reduce((acc, o) => acc + (o.monto || 0), 0);
+          
+          b.totalMonto = roundMoney(b.totalMonto);
+          b.montoPagado = roundMoney(Math.max(sumDirectPaid, sumAbonos));
+          b.montoPendiente = roundMoney(Math.max(0, b.totalMonto - b.montoPagado));
+        }
+
+        list.sort((a, b) => b.montoPendiente - a.montoPendiente || b.totalMonto - a.totalMonto);
+        return list;
+      }, [orders, payments]);
+
+      // Enviar orden desde el Kiosco
+      const handleCreateOrder = (newOrder) => {
+        setOrders(prev => [newOrder, ...prev]);
+
+        // Descontar inventario de la nevera
+        if (newOrder.items && newOrder.items.length > 0) {
+          setProducts(prev => prev.map(p => {
+            const bought = newOrder.items.find(it => it.nombre.toLowerCase().trim() === p.nombre.toLowerCase().trim());
+            if (bought) {
+              const qty = bought.cantidad || 1;
+              const sNev = Math.max(0, (p.stockNevera ?? 10) - qty);
+              return { ...p, stockNevera: sNev };
+            }
+            return p;
+          }));
+        }
+
+        if (window.confetti) {
+          window.confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+        }
+      };
+
+      const handleSavePayment = (pay) => {
+        const newPay = {
+          id: 'pay-' + Date.now(),
+          fecha: new Date().toISOString(),
+          nombre: pay.nombre.trim(),
+          monto: roundMoney(pay.monto),
+          metodo: pay.metodo || 'Pago Móvil',
+          nota: pay.nota || ''
+        };
+        setPayments(prev => [newPay, ...prev]);
+      };
+
+      const handlePinSubmit = (e) => {
+        e.preventDefault();
+        const correct = (settings.adminPin || '4520091').trim();
+        if (pinInput.trim() === correct) {
+          setIsAdminAuthenticated(true);
+          setShowPinModal(false);
+          setPinInput('');
+          setViewMode('admin');
+        } else {
+          setPinError(true);
+          setPinInput('');
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+          
+          {/* HEADER */}
+          <header className="bg-slate-900 text-white px-4 py-3 shadow-md border-b border-slate-800 sticky top-0 z-30">
+            <div className="max-w-6xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                {settings.logoUrl ? (
+                  <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 rounded-lg object-contain bg-white p-0.5" />
+                ) : (
+                  <span className={`w-8 h-8 rounded-xl ${currentTheme.primaryBg} text-white flex items-center justify-center font-black text-sm`}>
+                    ⚡
+                  </span>
+                )}
+                <div>
+                  <h1 className="text-sm sm:text-base font-black tracking-tight leading-none text-white">
+                    {settings.businessName}
+                  </h1>
+                  <p className="text-[10px] text-slate-400 font-semibold tracking-wide">
+                    {viewMode === 'kiosk' ? '📱 Modo Autoservicio NFC / QR' : '🔒 Panel de Administración y Cobranza'}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                {viewMode === 'kiosk' ? (
+                  <button
+                    onClick={() => {
+                      if (isAdminAuthenticated) setViewMode('admin');
+                      else setShowPinModal(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    🔒 Administrador
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setViewMode('kiosk')}
+                    className={`px-3.5 py-1.5 ${currentTheme.primaryBg} hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5`}
+                  >
+                    📱 Ver Kiosco NFC
+                  </button>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* CONTENIDO PRINCIPAL */}
+          <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6">
+            {viewMode === 'kiosk' ? (
+              <KioskView
+                products={products}
+                settings={settings}
+                theme={currentTheme}
+                orders={orders}
+                onCreateOrder={handleCreateOrder}
+              />
+            ) : (
+              <AdminDashboard
+                orders={orders}
+                setOrders={setOrders}
+                payments={payments}
+                setPayments={setPayments}
+                products={products}
+                setProducts={setProducts}
+                settings={settings}
+                setSettings={setSettings}
+                buyersSummary={buyersSummary}
+                adminTab={adminTab}
+                setAdminTab={setAdminTab}
+                theme={currentTheme}
+                onOpenRecordPayment={(b) => setRecordPaymentBuyer(b)}
+                onOpenExport={(b) => setExportBuyer(b)}
+              />
+            )}
+          </main>
+
+          <footer className="text-center py-4 text-xs text-slate-400 border-t border-slate-200 bg-white">
+            <p>SheetSync • Kiosco de Confianza & Cobranza Quincenal</p>
+          </footer>
+
+          {/* MODAL PIN */}
+          {showPinModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-base font-bold text-slate-900">Acceso Administrador</h3>
+                  <button onClick={() => setShowPinModal(false)} className="text-slate-400 font-bold">✕</button>
+                </div>
+                <form onSubmit={handlePinSubmit} className="space-y-4">
+                  <input
+                    type="password"
+                    autoFocus
+                    placeholder="••••••••"
+                    value={pinInput}
+                    onChange={(e) => { setPinInput(e.target.value); setPinError(false); }}
+                    className="w-full text-center tracking-[0.3em] text-2xl font-bold py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                  />
+                  {pinError && (
+                    <p className="text-xs text-red-600 font-semibold text-center">Contraseña incorrecta.</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPinModal(false)}
+                      className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className={`flex-1 py-2 ${currentTheme.primaryBg} text-white rounded-xl text-xs font-bold`}
+                    >
+                      Ingresar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL PAGO */}
+          {recordPaymentBuyer !== null && (
+            <RecordPaymentModal
+              buyer={recordPaymentBuyer}
+              allBuyers={buyersSummary}
+              currency={settings.currency}
+              theme={currentTheme}
+              onClose={() => setRecordPaymentBuyer(null)}
+              onSave={handleSavePayment}
+            />
+          )}
+
+          {/* MODAL EXPORTAR IMAGEN WHATSAPP */}
+          {exportBuyer !== null && (
+            <ExportImageModal
+              buyer={exportBuyer}
+              settings={settings}
+              theme={currentTheme}
+              onClose={() => setExportBuyer(null)}
+            />
+          )}
+
+        </div>
+      );
+    }
+
+    // --- KIOSCO CON FOTOS, NEVERA Y 2 OPCIONES ---
+    function KioskView({ products, settings, theme, orders, onCreateOrder }) {
+      const [nombre, setNombre] = useState('');
+      const [telefono, setTelefono] = useState('');
+      const [cart, setCart] = useState({});
+      const [showChoiceModal, setShowChoiceModal] = useState(false);
+      const [submitted, setSubmitted] = useState(null);
+      const [copiedBank, setCopiedBank] = useState(false);
+
+      const cartTotal = useMemo(() => {
+        let count = 0;
+        let price = 0;
+        for (const [id, qty] of Object.entries(cart)) {
+          if (qty > 0) {
+            const p = products.find(x => x.id === id);
+            if (p) {
+              count += qty;
+              price += (p.precio * qty);
+            }
+          }
+        }
+        return { count, price: roundMoney(price) };
+      }, [cart, products]);
+
+      const handleAdd = (id) => setCart(p => ({ ...p, [id]: (p[id] || 0) + 1 }));
+      const handleSub = (id) => setCart(p => ({ ...p, [id]: Math.max(0, (p[id] || 0) - 1) }));
+
+      const handleConfirmClick = (e) => {
+        e.preventDefault();
+        if (!nombre.trim()) return alert('Por favor ingresa tu nombre');
+        if (cartTotal.count === 0) return alert('Selecciona al menos un producto');
+        setShowChoiceModal(true);
+      };
+
+      const handleFinalSubmit = (tipoPago) => {
+        const itemsList = [];
+        const names = [];
+        for (const [id, qty] of Object.entries(cart)) {
+          if (qty > 0) {
+            const p = products.find(x => x.id === id);
+            if (p) {
+              itemsList.push({ nombre: p.nombre, cantidad: qty, precio: p.precio, emoji: p.emoji, imagenUrl: p.imagenUrl });
+              names.push(`${qty}x ${p.nombre}`);
+            }
+          }
+        }
+
+        const newOrd = {
+          id: 'ord-' + Date.now(),
+          fecha: new Date().toISOString(),
+          nombre: nombre.trim(),
+          telefono: telefono.trim(),
+          producto: names.join(', '),
+          cantidad: cartTotal.count,
+          items: itemsList,
+          monto: cartTotal.price,
+          tipoPago,
+          estadoPago: tipoPago === 'pagar_ahora' ? 'pagado' : 'pendiente'
+        };
+
+        onCreateOrder(newOrd);
+        setSubmitted(newOrd);
+        setShowChoiceModal(false);
+        setCart({});
+      };
+
+      if (submitted) {
+        return (
+          <div className="max-w-md mx-auto bg-white rounded-3xl p-6 sm:p-8 shadow-xl border-2 border-emerald-500 text-center space-y-5 animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-3xl">
+              ✅
+            </div>
+            <div>
+              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full uppercase">
+                {submitted.tipoPago === 'pagar_ahora' ? '💳 Pago Inmediato' : '🗓️ Cuenta para el 15'}
+              </span>
+              <h2 className="text-xl font-black text-slate-900 mt-1">¡Gracias, {submitted.nombre}!</h2>
+              <p className="text-xs text-slate-500">
+                {submitted.tipoPago === 'pagar_ahora'
+                  ? 'Has seleccionado pagar ahora. Revisa los datos de Pago Móvil abajo.'
+                  : 'Tu consumo ha sido anotado. Pagarás en la quincena.'}
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Monto:</span>
+                <span className="font-bold text-slate-900">{formatMoney(submitted.monto, settings.currency)}</span>
+              </div>
+
+              {submitted.tipoPago === 'pagar_ahora' && (
+                <div className="pt-2 border-t border-slate-200 space-y-2">
+                  <span className="font-bold text-emerald-800 block">Datos de Pago Móvil:</span>
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200 font-mono text-[11px] whitespace-pre-line text-slate-800">
+                    {settings.paymentInfo}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => { setSubmitted(null); setNombre(''); setTelefono(''); }}
+              className={`w-full py-3 ${theme.primaryBg} text-white rounded-xl font-bold text-sm shadow-md`}
+            >
+              Registrar otra persona
+            </button>
+          </div>
+        );
+      }
+
+      return (
+        <div className="max-w-xl mx-auto space-y-5">
+          
+          {/* BANNER CON LOGO */}
+          <div className={`bg-gradient-to-r ${theme.gradientHeader} p-6 rounded-3xl text-white shadow-lg flex items-center gap-4`}>
+            {settings.logoUrl ? (
+              <img src={settings.logoUrl} alt="Logo" className="w-16 h-16 rounded-2xl object-contain bg-white p-1 shadow-md shrink-0" />
+            ) : (
+              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl shrink-0">⚡</div>
+            )}
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                Kiosco de Confianza
+              </span>
+              <h2 className="text-xl font-black mt-0.5">{settings.businessName}</h2>
+              <p className="text-xs text-white/90">{settings.businessSubtitle}</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleConfirmClick} className="space-y-4">
+            
+            {/* IDENTIFICACIÓN */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <h3 className="text-sm font-bold text-slate-800">1. ¿Quién eres?</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Tu Nombre y Apellido *"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none"
+                />
+                <input
+                  type="tel"
+                  placeholder="Teléfono WhatsApp (Opcional)"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
+                />
+              </div>
+            </div>
+
+            {/* PRODUCTOS CON FOTO Y NEVERA */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <h3 className="text-sm font-bold text-slate-800">2. ¿Qué te estás llevando de la nevera?</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {products.map(p => {
+                  const qty = cart[p.id] || 0;
+                  const nevera = p.stockNevera ?? 10;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                        qty > 0 ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200">
+                          {p.imagenUrl ? (
+                            <img src={p.imagenUrl} alt={p.nombre} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-2xl">{p.emoji || '📦'}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{p.nombre}</p>
+                          <span className="text-xs font-black text-emerald-700 block">{formatMoney(p.precio, settings.currency)}</span>
+                          <span className="text-[10px] text-cyan-700 font-bold block">🧊 {nevera} en nevera</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
+                        {qty > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleSub(p.id)}
+                            className="w-7 h-7 bg-white rounded-lg font-bold text-xs"
+                          >
+                            -
+                          </button>
+                        )}
+                        {qty > 0 && <span className="w-6 text-center text-xs font-bold">{qty}</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleAdd(p.id)}
+                          className={`w-7 h-7 rounded-lg font-bold text-xs ${qty > 0 ? `${theme.primaryBg} text-white` : 'bg-white'}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* BOTÓN INFERIOR */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-lg sticky bottom-3 space-y-3">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Total compra:</span>
+                  <span className="text-xl font-black">{formatMoney(cartTotal.price, settings.currency)}</span>
+                </div>
+                <span className="text-xs font-bold text-slate-500">2 opciones de pago</span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={cartTotal.count === 0}
+                className={`w-full py-3.5 ${theme.primaryBg} disabled:opacity-50 text-white font-black text-sm rounded-xl shadow-md`}
+              >
+                Continuar con mi Compra →
+              </button>
+            </div>
+
+          </form>
+
+          {/* MODAL DE 2 OPCIONES: PAGAR AHORA vs PAGAR EL 15 */}
+          {showChoiceModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+              <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <h3 className="text-base font-black text-slate-900">¿Cómo deseas pagar hoy?</h3>
+                  <button onClick={() => setShowChoiceModal(false)} className="text-slate-400 font-bold">✕</button>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl text-xs flex justify-between font-bold">
+                  <span>Monto a pagar:</span>
+                  <span className="text-emerald-700 text-sm">{formatMoney(cartTotal.price, settings.currency)}</span>
+                </div>
+
+                {/* OPCIÓN 1 */}
+                <div className="p-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/50 space-y-2">
+                  <h4 className="text-xs font-black text-emerald-950">1. Pagar Ahora (Pago Móvil)</h4>
+                  <div className="bg-white p-2.5 rounded-xl border border-emerald-200 text-[11px] font-mono whitespace-pre-line">
+                    {settings.paymentInfo}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleFinalSubmit('pagar_ahora')}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs"
+                  >
+                    Confirmar y Pagar Ahora
+                  </button>
+                </div>
+
+                {/* OPCIÓN 2 */}
+                <div className="p-3.5 rounded-2xl border-2 border-slate-200 bg-white space-y-2">
+                  <h4 className="text-xs font-black text-slate-900">2. Pagar para el 15</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Anota este consumo a tu cuenta y liquidas todo junto el día 15 en la quincena.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleFinalSubmit('pagar_quincena')}
+                    className="w-full py-2 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-xs"
+                  >
+                    Anotar a mi cuenta (Pagar el 15)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // --- PANEL ADMIN (COBRANZA, DEUDORES & INVENTARIO) ---
+    function AdminDashboard({
+      orders, payments, products, setProducts, settings, setSettings,
+      buyersSummary, adminTab, setAdminTab, theme, onOpenRecordPayment, onOpenExport
+    }) {
+      const [searchQuery, setSearchQuery] = useState('');
+
+      return (
+        <div className="space-y-6">
+          
+          {/* TABS ADMIN */}
+          <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+            <button
+              onClick={() => setAdminTab('quincena')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold ${adminTab === 'quincena' ? `${theme.primaryBg} text-white` : 'bg-white'}`}
+            >
+              💰 Cuentas por Cobrar & Deudores
+            </button>
+            <button
+              onClick={() => setAdminTab('inventory')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold ${adminTab === 'inventory' ? `${theme.primaryBg} text-white` : 'bg-white'}`}
+            >
+              🧊 Control Inventario Nevera
+            </button>
+            <button
+              onClick={() => setAdminTab('settings')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold ${adminTab === 'settings' ? `${theme.primaryBg} text-white` : 'bg-white'}`}
+            >
+              ⚙️ Colores, Logo & Pago Móvil
+            </button>
+          </div>
+
+          {/* TAB: CUENTAS POR COBRAR CON PRODUCTOS Y BOTÓN IMAGEN WHATSAPP */}
+          {adminTab === 'quincena' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Deudores y Cuentas por Cobrar</h3>
+                  <p className="text-xs text-slate-500">Revisa qué productos se llevó cada persona y comparte su cuenta en imagen con Pago Móvil</p>
+                </div>
+                <button
+                  onClick={() => onOpenRecordPayment(null)}
+                  className={`px-3.5 py-2 ${theme.primaryBg} text-white rounded-xl text-xs font-bold`}
+                >
+                  + Registrar Pago
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {buyersSummary.map(b => {
+                  const hasDebt = b.montoPendiente > 0;
+                  return (
+                    <div
+                      key={b.nombre}
+                      className={`bg-white p-5 rounded-2xl border ${hasDebt ? 'border-rose-200' : 'border-slate-200'}`}
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-100">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-black text-slate-900">{b.nombre}</h4>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${hasDebt ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {hasDebt ? 'FALTA POR PAGAR' : 'AL DÍA ✓'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500">{b.telefono || 'Sin teléfono'}</p>
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Cuánto debe:</span>
+                          <span className={`text-xl font-black ${hasDebt ? 'text-rose-600' : 'text-emerald-700'}`}>
+                            {formatMoney(b.montoPendiente, settings.currency)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* PRODUCTOS QUE SE LLEVÓ Y CANTIDAD */}
+                      <div className="py-3">
+                        <span className="text-xs font-bold text-slate-700 block mb-1.5">
+                          Productos que se llevó y cantidades:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(b.productosDesglose).map(([prod, info]) => (
+                            <span key={prod} className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg text-xs font-semibold border border-slate-200">
+                              <strong>{info.cantidad}x</strong> {prod} ({formatMoney(info.total, settings.currency)})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* BOTONES */}
+                      <div className="pt-2 flex justify-end gap-2">
+                        <button
+                          onClick={() => onOpenExport(b)}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm"
+                        >
+                          📸 Compartir Imagen WhatsApp (Con Pago Móvil)
+                        </button>
+                        <button
+                          onClick={() => onOpenRecordPayment(b)}
+                          className="px-3 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold"
+                        >
+                          Registrar Pago
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CONTROL DE INVENTARIO */}
+          {adminTab === 'inventory' && (
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+              <h3 className="text-base font-black text-slate-900">Control de Inventario (Nevera vs Depósito)</h3>
+              <div className="divide-y divide-slate-100">
+                {products.map(p => (
+                  <div key={p.id} className="py-3 flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{p.emoji || '📦'}</span>
+                      <div>
+                        <p className="font-bold text-slate-900">{p.nombre}</p>
+                        <p className="text-emerald-700 font-bold">{formatMoney(p.precio, settings.currency)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <span className="font-bold text-cyan-800 block">🧊 En Nevera:</span>
+                        <input
+                          type="number"
+                          value={p.stockNevera ?? 10}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            setProducts(prev => prev.map(x => x.id === p.id ? { ...x, stockNevera: val } : x));
+                          }}
+                          className="w-16 px-2 py-1 border rounded-lg font-black text-center"
+                        />
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-700 block">📦 En Depósito:</span>
+                        <input
+                          type="number"
+                          value={p.stockDeposito ?? 20}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            setProducts(prev => prev.map(x => x.id === p.id ? { ...x, stockDeposito: val } : x));
+                          }}
+                          className="w-16 px-2 py-1 border rounded-lg font-black text-center"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: AJUSTES, LOGO Y COLORES */}
+          {adminTab === 'settings' && (
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-5 max-w-xl">
+              <h3 className="text-base font-black text-slate-900">Personalización de Colores, Logo y Pago Móvil</h3>
+              
+              {/* LOGO */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Logo del Kiosco (URL de imagen):</label>
+                <input
+                  type="url"
+                  placeholder="https://ejemplo.com/logo.png"
+                  value={settings.logoUrl || ''}
+                  onChange={(e) => setSettings({ ...settings, logoUrl: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs outline-none"
+                />
+              </div>
+
+              {/* COLORES */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Color de la Aplicación:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(THEMES).map(([id, th]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, themeColor: id })}
+                      className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-2 ${settings.themeColor === id ? 'ring-2 ring-slate-900 bg-slate-50' : 'bg-white'}`}
+                    >
+                      <span className={`w-4 h-4 rounded-full ${th.previewBg}`} />
+                      <span>{th.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* PAGO MÓVIL */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Datos de Pago Móvil / Banco:</label>
+                <textarea
+                  rows={4}
+                  value={settings.paymentInfo}
+                  onChange={(e) => setSettings({ ...settings, paymentInfo: e.target.value })}
+                  className="w-full p-3 border rounded-xl text-xs font-mono outline-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => alert('¡Configuración guardada!')}
+                className={`w-full py-2.5 ${theme.primaryBg} text-white font-bold rounded-xl text-xs`}
+              >
+                Guardar Ajustes
+              </button>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // --- MODAL DE IMAGEN PARA WHATSAPP CON PAGO MÓVIL ---
+    function ExportImageModal({ buyer, settings, theme, onClose }) {
+      const canvasRef = useRef(null);
+      const [copied, setCopied] = useState(false);
+
+      useEffect(() => {
+        drawCanvas();
+      }, [buyer, settings, theme]);
+
+      const drawCanvas = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        canvas.width = 640;
+        canvas.height = 920;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Header gradient
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        grad.addColorStop(0, theme.canvasGrad1 || '#059669');
+        grad.addColorStop(1, theme.canvasGrad2 || '#0d9488');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, 130);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(settings.businessName.toUpperCase(), canvas.width / 2, 55);
+
+        ctx.font = '12px sans-serif';
+        ctx.fillText('ESTADO DE CUENTA & COBRANZA', canvas.width / 2, 85);
+
+        // Cliente
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(30, 150, 580, 75);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('CLIENTE / COMPRADOR:', 45, 175);
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'black 18px sans-serif';
+        ctx.fillText(buyer.nombre, 45, 205);
+
+        // Tabla Header
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(30, 240, 580, 32);
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('PRODUCTO QUE SE LLEVÓ', 45, 260);
+        ctx.textAlign = 'center';
+        ctx.fillText('CANTIDAD', 440, 260);
+        ctx.textAlign = 'right';
+        ctx.fillText('TOTAL', 590, 260);
+
+        // Productos
+        let y = 300;
+        Object.entries(buyer.productosDesglose).slice(0, 8).forEach(([prod, info]) => {
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 13px sans-serif';
+          ctx.fillText(prod, 45, y);
+
+          ctx.textAlign = 'center';
+          ctx.fillText(`${info.cantidad} uds`, 440, y);
+
+          ctx.textAlign = 'right';
+          ctx.fillText(formatMoney(info.total, settings.currency), 590, y);
+          y += 30;
+        });
+
+        // Box de Deuda
+        y += 20;
+        ctx.fillStyle = '#fff1f2';
+        ctx.fillRect(30, y, 580, 65);
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(30, y, 580, 65);
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#be123c';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText('🔴 CUÁNTO DEBE (FALTA POR PAGAR):', 45, y + 38);
+
+        ctx.textAlign = 'right';
+        ctx.font = 'black 24px sans-serif';
+        ctx.fillText(formatMoney(buyer.montoPendiente, settings.currency), 590, y + 42);
+
+        // Box de Pago Móvil
+        y += 85;
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(30, y, 580, 140);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(30, y, 580, 140);
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText('💳 DATOS PARA REALIZAR EL PAGO MÓVIL:', 45, y + 25);
+
+        ctx.font = '11px monospace';
+        ctx.fillStyle = '#334155';
+        settings.paymentInfo.split('\n').slice(0, 5).forEach((line, i) => {
+          ctx.fillText(line, 45, y + 50 + (i * 18));
+        });
+      };
+
+      const handleDownload = () => {
+        const link = document.createElement('a');
+        link.download = `Cuenta_${buyer.nombre}_PagoMovil.png`;
+        link.href = canvasRef.current.toDataURL('image/png');
+        link.click();
+      };
+
+      const handleCopyImage = () => {
+        canvasRef.current.toBlob(blob => {
+          if (blob) {
+            navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }
+        });
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b">
+              <h3 className="text-sm font-black text-slate-900">Imagen para WhatsApp de {buyer.nombre}</h3>
+              <button onClick={onClose} className="font-bold text-slate-400">✕</button>
+            </div>
+
+            <canvas ref={canvasRef} className="w-full rounded-xl shadow-md border" />
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopyImage}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold"
+              >
+                {copied ? '✓ ¡Copiada!' : 'Copiar Imagen'}
+              </button>
+              <button
+                onClick={handleDownload}
+                className={`flex-1 py-2.5 ${theme.primaryBg} text-white rounded-xl text-xs font-bold shadow-xs`}
+              >
+                Descargar PNG
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // MODAL REGISTRAR PAGO
+    function RecordPaymentModal({ buyer, allBuyers, currency, theme, onClose, onSave }) {
+      const [nombre, setNombre] = useState(buyer ? buyer.nombre : (allBuyers[0]?.nombre || ''));
+      const [monto, setMonto] = useState(buyer && buyer.montoPendiente > 0 ? String(buyer.montoPendiente) : '');
+      const [metodo, setMetodo] = useState('Pago Móvil');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const num = parseFloat(monto);
+        if (!nombre || !num || num <= 0) return alert('Ingresa un monto válido');
+        onSave({ nombre, monto: num, metodo });
+        onClose();
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b">
+              <h3 className="text-sm font-bold text-slate-900">Registrar Pago</h3>
+              <button onClick={onClose} className="font-bold text-slate-400">✕</button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold block mb-1">Comprador:</label>
+                <select
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl text-xs font-bold"
+                >
+                  {allBuyers.map(b => (
+                    <option key={b.nombre} value={b.nombre}>
+                      {b.nombre} (Debe: {formatMoney(b.montoPendiente, currency)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold block mb-1">Monto recibido ({currency}):</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl text-sm font-black"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={onClose} className="flex-1 py-2 bg-slate-100 rounded-xl text-xs font-bold">
+                  Cancelar
+                </button>
+                <button type="submit" className={`flex-1 py-2 ${theme.primaryBg} text-white rounded-xl text-xs font-bold`}>
+                  Guardar Pago
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

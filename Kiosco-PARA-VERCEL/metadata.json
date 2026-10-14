@@ -1,0 +1,6 @@
+{
+  "name": "SheetSync - Registro de Pedidos y Ventas a Google Sheets",
+  "description": "Sistema de registro de ventas y pedidos conectado en tiempo real a Google Sheets mediante Google Apps Script doPost.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
